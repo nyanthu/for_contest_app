@@ -145,7 +145,7 @@ impl eframe::App for DataTool {
                     .unwrap_or("unknown".into());
 
                 ui.label(format!(
-                    "Share databases from sites only within the same Wi-Fi network.\nhttp://{}:14143/{}/",
+                    "Share databases from sites only within the same Wi-Fi network.\n http://{}:14143/{}/",
                     ip, self.managername.trim()
                 ));
                 ui.label("Alert: url isn't https");
