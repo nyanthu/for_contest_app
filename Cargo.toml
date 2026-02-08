@@ -1,5 +1,5 @@
 [package]
-name = "remote_ctrl"
+name = "datatool"
 version = "0.1.0"
 edition = "2024"
 
