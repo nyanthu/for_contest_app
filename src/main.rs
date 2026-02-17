@@ -1,12 +1,18 @@
 use eframe::egui::*;
+use egui::{Color32, RichText};
 use egui_extras::{Column, TableBuilder};
-use std::net::UdpSocket;
+use libc::geteuid;
+use std::{fmt::Formatter, net::UdpSocket};
+
+fn is_admin() -> bool {
+    unsafe { geteuid() == 0 }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 struct Item {
     added_user: String,
     name: String,
-    id: String,
+    pay: String,
     value: String,
 }
 
@@ -22,12 +28,13 @@ struct DataTool {
     user_admin: bool,
     // manage
     name: String,
-    id: String,
+    pay: String,
     description: String,
     //manage data
     manage_items: Vec<Item>,
     //info alert
     show_alert: bool,
+    alert_info: String,
 }
 
 impl Default for DataTool {
@@ -41,18 +48,19 @@ impl Default for DataTool {
             passcode: "".to_string(),
             user_admin: false,
             name: "".to_string(),
-            id: "".to_string(),
+            pay: "".to_string(),
             description: "".to_string(),
 
             manage_items: (0..10)
                 .map(|i| Item {
                     added_user: "Test".to_string(),
                     name: format!("Item {i}"),
-                    id: i.to_string(),
+                    pay: i.to_string(),
                     value: (i * 10).to_string(),
                 })
                 .collect(),
             show_alert: false,
+            alert_info: "".to_string(),
         }
     }
 }
@@ -80,13 +88,21 @@ impl eframe::App for DataTool {
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
                 .show(ctx, |ui| {
-                    ui.label("password wasn't match account.\nMake new account?");
+                    ui.label(self.alert_info.clone());
                     ui.separator();
 
-                    if ui.button("Make New Account").clicked() {
+                    if ui.button("Yes").clicked() {
                         self.show_alert = false;
+                        if is_admin() {
+                            println!("admin (root)");
+                            self.user_admin = true;
+                        } else {
+                            println!("not admin");
+                            self.alert_info = "You are not admin, so cannot continue.".to_string();
+                            self.show_alert = true;
+                        }
                     }
-                    if ui.button("Retry").clicked() {
+                    if ui.button("OK").clicked() {
                         self.show_alert = false;
                     }
                 });
@@ -129,6 +145,7 @@ impl eframe::App for DataTool {
                             self.user_admin = true;
                             self.already_approved = true;
                         } else {
+                            self.alert_info = "password wasn't match account.\nIf you are forget, you can pass by pc-password?".to_string();
                             self.show_alert = true;
 
                         }
@@ -151,9 +168,14 @@ impl eframe::App for DataTool {
                 ui.label("Alert: url isn't https");
 
                 ui.group(|ui| {
+                    let mut sum_money: i64 = 0; // まず初期値をセット
+                    for i in &self.manage_items {
+                        sum_money += i.pay.parse::<i64>().unwrap();
+                    }
+
                     // グループの中身の高さを固定
                     egui::ScrollArea::vertical()
-                        .max_height(200.0) // ← ここが「維持したい高さ」
+                        .max_height(200.0)
                         .show(ui, |ui| {
                             TableBuilder::new(ui)
                                 .striped(true)
@@ -166,7 +188,7 @@ impl eframe::App for DataTool {
                                 .header(20.0, |mut header| {
                                     header.col(|ui| { ui.label("By"); });
                                     header.col(|ui| { ui.label("Name"); });
-                                    header.col(|ui| { ui.label("ID"); });
+                                    header.col(|ui| { ui.label(format!("Pay sum: {}", sum_money)); });
                                     header.col(|ui| { ui.label("Description"); });
                                 })
                                 .body(|mut body| {
@@ -174,20 +196,30 @@ impl eframe::App for DataTool {
                                         body.row(18.0, |mut row| {
                                             row.col(|ui| { ui.label(&item.added_user); });
                                             row.col(|ui| { ui.label(&item.name); });
-                                            row.col(|ui| { ui.label(item.id.to_string()); });
+
+                                            // Pay がマイナスなら赤色にする
+                                            let pay_val: i64 = item.pay.parse().unwrap_or(0);
+                                            let pay_label = if pay_val < 0 {
+                                                RichText::new(item.pay.clone()).color(Color32::from_rgb(128, 0, 0))
+                                            } else {
+                                                RichText::new(item.pay.clone()).color(Color32::from_rgb(0, 128, 0))
+                                            };
+                                            row.col(|ui| { ui.label(pay_label); });
+
                                             row.col(|ui| { ui.label(item.value.to_string()); });
                                         });
                                     }
                                 });
                         });
+
                 });
 
 
                 ui.label("Name:");
                 ui.text_edit_singleline(&mut self.name);
 
-                ui.label("ID:");
-                ui.text_edit_singleline(&mut self.id);
+                ui.label("pay:");
+                ui.text_edit_singleline(&mut self.pay);
 
                 ui.label("Description");
                 ui.text_edit_multiline(&mut self.description);
@@ -199,12 +231,12 @@ impl eframe::App for DataTool {
                     self.manage_items.push(Item {
                         added_user: self.managername.to_string(),
                         name: self.name.to_string(),
-                        id: self.id.to_string(),
+                        pay: self.pay.to_string(),
                         value: self.description.to_string(),
                     });
 
                     self.name.clear();
-                    self.id.clear();
+                    self.pay.clear();
                     self.description.clear();
                 }
             }

@@ -720,6 +720,7 @@ dependencies = [
  "eframe",
  "egui",
  "egui_extras",
+ "libc",
 ]
 
 [[package]]
